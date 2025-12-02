@@ -8,7 +8,7 @@ const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactor
 // STEP1: SkyWayAuthToken generation
 // TODO: Replace with your own AppID and SecretKey before production use.
 const appId = "9ce04826-c26a-4dc3-b74b-84317a915529"; // Replace with your AppID
-const secretKey = "8Z2RdMT/+rlCnC9CGjpDSPTcNpKV7xrfOPEuZcuS7ag="; // Replace with your SecretKey
+const secretKey = ""; // Replace with your SecretKey
 const token = new SkyWayAuthToken({
   jti: uuidV4(),
   iat: nowInSec(),
