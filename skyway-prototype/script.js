@@ -1,22 +1,33 @@
+// 🔹 背景ぼかしライブラリを読み込む
 import skywayVideoProcessors from "https://esm.sh/skyway-video-processors";
 const { BlurBackground } = skywayVideoProcessors;
 
-const waitForSkywayRoom = async (retries = 40, intervalMs = 250) => {
-  for (let i = 0; i < retries; i += 1) {
+// 🔹 SkyWay Room SDK が読み込まれるまで待つ
+const waitForSkywayRoom = async (retries = 40, intervalMs = 200) => {
+  for (let i = 0; i < retries; i++) {
     if (globalThis.skyway_room) return globalThis.skyway_room;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-  throw new Error("SkyWay SDK (skyway_room) ????????????CDN???????????????");
+  throw new Error("SkyWay SDK（room）が読み込まれていません。CDN を確認してください。");
 };
 
 const main = async () => {
   const skywayRoom = await waitForSkywayRoom();
-  const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } = skywayRoom;
+  const {
+    nowInSec,
+    SkyWayAuthToken,
+    SkyWayContext,
+    SkyWayRoom,
+    SkyWayStreamFactory,
+    uuidV4,
+  } = skywayRoom;
 
-  // STEP1: SkyWayAuthToken???
-  // TODO: ????AppID?SecretKey??????????
-  const appId = "9ce04826-c26a-4dc3-b74b-84317a915529"; // Replace with your AppID
-  const secretKey = "8Z2RdMT/+rlCnC9CGjpDSPTcNpKV7xrfOPEuZcuS7ag="; // Replace with your SecretKey
+  // ==============================
+  // 🔐 SkyWay 認証トークン
+  // ==============================
+  const appId = "9ce04826-c26a-4dc3-b74b-84317a915529";
+  const secretKey = "8Z2RdMT/+rlCnC9CGjpDSPTcNpKV7xrfOPEuZcuS7ag=";
+
   const token = new SkyWayAuthToken({
     jti: uuidV4(),
     iat: nowInSec(),
@@ -43,11 +54,7 @@ const main = async () => {
             sfuBots: [
               {
                 actions: ["write"],
-                forwardings: [
-                  {
-                    actions: ["write"],
-                  },
-                ],
+                forwardings: [{ actions: ["write"] }],
               },
             ],
           },
@@ -56,6 +63,9 @@ const main = async () => {
     },
   }).encode(secretKey);
 
+  // ==============================
+  // 🔧 DOM 取得
+  // ==============================
   const localAudio = document.getElementById("local-audio");
   const localVideo = document.getElementById("local-video");
   const roomNameInput = document.getElementById("room-name");
@@ -67,127 +77,69 @@ const main = async () => {
   const remoteVideo = document.getElementById("remote-video");
   const remoteAudio = document.getElementById("remote-audio");
   const buttonArea = document.querySelector("#button-area");
-  const maxNumberParticipants = 2;
 
   let isJoined = false;
   let isMuted = false;
   let me = null;
   let room = null;
-  let localAudioPublication = null;
-  let localVideoPublication = null;
 
-  leaveButton.disabled = true;
   localMuteButton.disabled = true;
+  leaveButton.disabled = true;
 
+  // ==============================
+  // 🎥 背景ぼかしの初期化
+  // ==============================
   let backgroundProcessor = null;
   try {
     backgroundProcessor = new BlurBackground();
     await backgroundProcessor.initialize();
   } catch (e) {
-    console.warn("????????????????????????????????", e);
+    console.warn("背景ぼかしが利用できません:", e);
     backgroundProcessor = null;
   }
 
-  const video = typeof SkyWayStreamFactory.createCustomVideoStream === "function" && backgroundProcessor
-    ? await SkyWayStreamFactory.createCustomVideoStream(backgroundProcessor, { stopTrackWhenDisabled: true })
-    : await SkyWayStreamFactory.createCameraVideoStream();
+  // ==============================
+  // 🎥 カメラ・マイクの取得
+  // ==============================
+  let video;
+  if (SkyWayStreamFactory.createCustomVideoStream && backgroundProcessor) {
+    video = await SkyWayStreamFactory.createCustomVideoStream(backgroundProcessor, {
+      stopTrackWhenDisabled: true,
+    });
+  } else {
+    video = await SkyWayStreamFactory.createCameraVideoStream();
+  }
 
   const audio = await SkyWayStreamFactory.createMicrophoneAudioStream();
+
   audio.attach(localAudio);
   video.attach(localVideo);
 
-  const closeRoom = () => {
-    buttonArea.innerHTML = "";
-    remoteId.textContent = "";
-    myId.textContent = "";
-    localMuteButton.disabled = true;
-    leaveButton.disabled = true;
-    isMuted = false;
-    isJoined = false;
-    localMuteButton.textContent = "?????OFF";
-  };
+  // ==============================
+  // 🔁 ミュート切替
+  // ==============================
+  let localAudioPublication = null;
+  let localVideoPublication = null;
 
   const toggleLocalMute = async () => {
     if (!localAudioPublication || !localVideoPublication) return;
+
     if (isMuted) {
       await localAudioPublication.enable();
       await localVideoPublication.enable();
+      localMuteButton.textContent = "映像・音声OFF";
       isMuted = false;
-      localMuteButton.textContent = "?????OFF";
     } else {
       await localAudioPublication.disable();
       await localVideoPublication.disable();
+      localMuteButton.textContent = "映像・音声ON";
       isMuted = true;
-      localMuteButton.textContent = "????? ON";
     }
   };
 
-  const subscribeAndAttach = (publication) => {
-    if (!me) return;
-    if (publication.publisher.id === me.id) return;
-
-    remoteId.textContent = publication.publisher.id;
-
-    if (buttonArea.childElementCount >= 3) {
-      buttonArea.innerHTML = "";
-    }
-
-    const subscribeButton = document.createElement("button");
-    subscribeButton.textContent = publication.contentType;
-    buttonArea.appendChild(subscribeButton);
-
-    let encodingSelector = null;
-    if (publication.contentType === "video") {
-      const selectData = [
-        { value: "low", label: "???" },
-        { value: "middle", label: "???" },
-        { value: "high", label: "???" },
-      ];
-      encodingSelector = document.createElement("select");
-      selectData.forEach((item) => {
-        const option = document.createElement("option");
-        option.value = item.value;
-        option.text = item.label;
-        encodingSelector.appendChild(option);
-      });
-      buttonArea.appendChild(encodingSelector);
-    }
-
-    subscribeButton.onclick = async () => {
-      const { stream, subscription } = await me.subscribe(publication.id);
-      switch (stream.track.kind) {
-        case "video":
-          stream.attach(remoteVideo);
-          subscription.changePreferredEncoding("low");
-          if (encodingSelector) {
-            encodingSelector.addEventListener("change", function () {
-              switch (this.value) {
-                case "low":
-                  subscription.changePreferredEncoding("low");
-                  break;
-                case "middle":
-                  subscription.changePreferredEncoding("middle");
-                  break;
-                case "high":
-                  subscription.changePreferredEncoding("high");
-                  break;
-                default:
-                  break;
-              }
-            });
-          }
-          publication.onDisabled.add(() => remoteVideo.load());
-          break;
-        case "audio":
-          stream.attach(remoteAudio);
-          break;
-        default:
-          return;
-      }
-      subscribeButton.disabled = true;
-    };
-  };
-
+  // ==============================
+  // 🔗 Room 接続
+  // ==============================
   joinButton.onclick = async () => {
     if (roomNameInput.value === "") return;
     if (isJoined) return;
@@ -198,27 +150,21 @@ const main = async () => {
       name: roomNameInput.value,
     });
 
-    if (room.members.length > maxNumberParticipants) {
-      console.log("??????(" + maxNumberParticipants + ")???????");
-      room.dispose();
-      return;
-    }
-
     me = await room.join();
     myId.textContent = me.id;
     isJoined = true;
 
-    localMuteButton.disabled = false;
-    leaveButton.disabled = false;
-
     localAudioPublication = await me.publish(audio);
     localVideoPublication = await me.publish(video, {
       encodings: [
-        { maxBitrate: 80_000, id: "low" },
-        { maxBitrate: 500_000, id: "middle" },
-        { maxBitrate: 5_000_000, id: "high" },
+        { id: "low", maxBitrate: 80_000 },
+        { id: "middle", maxBitrate: 500_000 },
+        { id: "high", maxBitrate: 5_000_000 },
       ],
     });
+
+    localMuteButton.disabled = false;
+    leaveButton.disabled = false;
 
     room.publications.forEach(subscribeAndAttach);
     room.onStreamPublished.add((e) => subscribeAndAttach(e.publication));
@@ -228,15 +174,51 @@ const main = async () => {
     leaveButton.onclick = async () => {
       await me.leave();
       await room.close();
-      closeRoom();
+      resetUI();
     };
+  };
 
-    room.onMemberLeft.add(() => closeRoom());
+  // ==============================
+  // 📡 ストリーム購読
+  // ==============================
+  const subscribeAndAttach = (publication) => {
+    if (!me || publication.publisher.id === me.id) return;
+
+    remoteId.textContent = publication.publisher.id;
+
+    const subscribeButton = document.createElement("button");
+    subscribeButton.textContent = publication.contentType;
+    buttonArea.appendChild(subscribeButton);
+
+    subscribeButton.onclick = async () => {
+      const { stream } = await me.subscribe(publication.id);
+
+      if (stream.track.kind === "video") {
+        stream.attach(remoteVideo);
+      } else if (stream.track.kind === "audio") {
+        stream.attach(remoteAudio);
+      }
+
+      subscribeButton.disabled = true;
+    };
+  };
+
+  // ==============================
+  // UI リセット
+  // ==============================
+  const resetUI = () => {
+    myId.textContent = "";
+    remoteId.textContent = "";
+    buttonArea.innerHTML = "";
+    localMuteButton.disabled = true;
+    leaveButton.disabled = true;
+    localMuteButton.textContent = "映像・音声OFF";
+    isJoined = false;
+    isMuted = false;
   };
 };
 
 main().catch((err) => {
   console.error(err);
-  alert(err.message || err);
+  alert("エラー: " + err.message);
 });
-
