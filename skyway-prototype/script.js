@@ -1,14 +1,17 @@
-
 import skywayVideoProcessors from "https://esm.sh/skyway-video-processors";
 const { BlurBackground } = skywayVideoProcessors;
 const backgroundProcessor = new BlurBackground();
 
-const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } = skyway_room;
+const skywayRoomLib = globalThis.skyway_room;
+if (!skywayRoomLib) {
+  throw new Error("SkyWay SDK (skyway_room) ????????????CDN???????????????");
+}
+const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } = skywayRoomLib;
 
-// STEP1: SkyWayAuthToken generation
-// TODO: Replace with your own AppID and SecretKey before production use.
+// STEP1: SkyWayAuthToken???
+// TODO: ????AppID?SecretKey??????????
 const appId = "9ce04826-c26a-4dc3-b74b-84317a915529"; // Replace with your AppID
-const secretKey = ""; // Replace with your SecretKey
+const secretKey = "8Z2RdMT/+rlCnC9CGjpDSPTcNpKV7xrfOPEuZcuS7ag="; // Replace with your SecretKey
 const token = new SkyWayAuthToken({
   jti: uuidV4(),
   iat: nowInSec(),
