@@ -1,15 +1,25 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SkyWayハンズオンサンプル</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/@skyway-sdk/room@^1"></script>
-  <script src="libs/skyway-room.js" defer></script>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- SkyWay Core -->
+  <script src="https://cdn.jsdelivr.net/npm/@skyway-sdk/core@1.7.2/skyway-core.min.js"></script>
+
+  <!-- SkyWay RTC（StreamFactory を含む）-->
+  <script src="https://cdn.jsdelivr.net/npm/@skyway-sdk/rtc@1.7.2/skyway-rtc.min.js"></script>
+
+  <!-- SkyWay Room SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@skyway-sdk/room@1.7.2/skyway-room.min.js"></script>
 </head>
+
 <body>
   <h1>SkyWayハンズオンサンプル</h1>
+
   <div class="grid-container">
     <div id="local" class="item">
       <video id="local-video" autoplay playsinline></video>
@@ -29,6 +39,7 @@
     </div>
   </div>
 
+  <!-- ★ SkyWay を全て読み込んだ後で script.js を実行する -->
   <script type="module" src="script.js"></script>
 </body>
 </html>

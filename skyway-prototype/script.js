@@ -1,61 +1,61 @@
 import skywayVideoProcessors from "https://esm.sh/skyway-video-processors";
 const { BlurBackground } = skywayVideoProcessors;
-const backgroundProcessor = new BlurBackground();
 
-const skywayRoomLib = globalThis.skyway_room;
-if (!skywayRoomLib) {
+const waitForSkywayRoom = async (retries = 40, intervalMs = 250) => {
+  for (let i = 0; i < retries; i += 1) {
+    if (globalThis.skyway_room) return globalThis.skyway_room;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
   throw new Error("SkyWay SDK (skyway_room) ????????????CDN???????????????");
-}
-const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } = skywayRoomLib;
+};
 
-// STEP1: SkyWayAuthToken???
-// TODO: ????AppID?SecretKey??????????
-const appId = "9ce04826-c26a-4dc3-b74b-84317a915529"; // Replace with your AppID
-const secretKey = "8Z2RdMT/+rlCnC9CGjpDSPTcNpKV7xrfOPEuZcuS7ag="; // Replace with your SecretKey
-const token = new SkyWayAuthToken({
-  jti: uuidV4(),
-  iat: nowInSec(),
-  exp: nowInSec() + 60 * 60 * 24,
-  scope: {
-    app: {
-      id: appId,
-      turn: true,
-      actions: ["read"],
-      channels: [
-        {
-          id: "*",
-          name: "*",
-          actions: ["write"],
-          members: [
-            {
-              id: "*",
-              name: "*",
-              actions: ["write"],
-              publication: {
+const main = async () => {
+  const skywayRoom = await waitForSkywayRoom();
+  const { nowInSec, SkyWayAuthToken, SkyWayContext, SkyWayRoom, SkyWayStreamFactory, uuidV4 } = skywayRoom;
+
+  // STEP1: SkyWayAuthToken???
+  // TODO: ????AppID?SecretKey??????????
+  const appId = "9ce04826-c26a-4dc3-b74b-84317a915529"; // Replace with your AppID
+  const secretKey = "8Z2RdMT/+rlCnC9CGjpDSPTcNpKV7xrfOPEuZcuS7ag="; // Replace with your SecretKey
+  const token = new SkyWayAuthToken({
+    jti: uuidV4(),
+    iat: nowInSec(),
+    exp: nowInSec() + 60 * 60 * 24,
+    scope: {
+      app: {
+        id: appId,
+        turn: true,
+        actions: ["read"],
+        channels: [
+          {
+            id: "*",
+            name: "*",
+            actions: ["write"],
+            members: [
+              {
+                id: "*",
+                name: "*",
                 actions: ["write"],
+                publication: { actions: ["write"] },
+                subscription: { actions: ["write"] },
               },
-              subscription: {
+            ],
+            sfuBots: [
+              {
                 actions: ["write"],
+                forwardings: [
+                  {
+                    actions: ["write"],
+                  },
+                ],
               },
-            },
-          ],
-          sfuBots: [
-            {
-              actions: ["write"],
-              forwardings: [
-                {
-                  actions: ["write"],
-                },
-              ],
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+      },
     },
-  },
-}).encode(secretKey);
+  }).encode(secretKey);
 
-(async () => {
   const localAudio = document.getElementById("local-audio");
   const localVideo = document.getElementById("local-video");
   const roomNameInput = document.getElementById("room-name");
@@ -71,7 +71,6 @@ const token = new SkyWayAuthToken({
 
   let isJoined = false;
   let isMuted = false;
-  let selectBox = null;
   let me = null;
   let room = null;
   let localAudioPublication = null;
@@ -80,10 +79,19 @@ const token = new SkyWayAuthToken({
   leaveButton.disabled = true;
   localMuteButton.disabled = true;
 
-  await backgroundProcessor.initialize();
-  const video = await SkyWayStreamFactory.createCustomVideoStream(backgroundProcessor, {
-    stopTrackWhenDisabled: true,
-  });
+  let backgroundProcessor = null;
+  try {
+    backgroundProcessor = new BlurBackground();
+    await backgroundProcessor.initialize();
+  } catch (e) {
+    console.warn("????????????????????????????????", e);
+    backgroundProcessor = null;
+  }
+
+  const video = typeof SkyWayStreamFactory.createCustomVideoStream === "function" && backgroundProcessor
+    ? await SkyWayStreamFactory.createCustomVideoStream(backgroundProcessor, { stopTrackWhenDisabled: true })
+    : await SkyWayStreamFactory.createCameraVideoStream();
+
   const audio = await SkyWayStreamFactory.createMicrophoneAudioStream();
   audio.attach(localAudio);
   video.attach(localVideo);
@@ -96,7 +104,7 @@ const token = new SkyWayAuthToken({
     leaveButton.disabled = true;
     isMuted = false;
     isJoined = false;
-    localMuteButton.textContent = "映像・音声OFF";
+    localMuteButton.textContent = "?????OFF";
   };
 
   const toggleLocalMute = async () => {
@@ -105,12 +113,12 @@ const token = new SkyWayAuthToken({
       await localAudioPublication.enable();
       await localVideoPublication.enable();
       isMuted = false;
-      localMuteButton.textContent = "映像・音声OFF";
+      localMuteButton.textContent = "?????OFF";
     } else {
       await localAudioPublication.disable();
       await localVideoPublication.disable();
       isMuted = true;
-      localMuteButton.textContent = "映像・音声 ON";
+      localMuteButton.textContent = "????? ON";
     }
   };
 
@@ -131,9 +139,9 @@ const token = new SkyWayAuthToken({
     let encodingSelector = null;
     if (publication.contentType === "video") {
       const selectData = [
-        { value: "low", label: "低画質" },
-        { value: "middle", label: "中画質" },
-        { value: "high", label: "高画質" },
+        { value: "low", label: "???" },
+        { value: "middle", label: "???" },
+        { value: "high", label: "???" },
       ];
       encodingSelector = document.createElement("select");
       selectData.forEach((item) => {
@@ -191,7 +199,7 @@ const token = new SkyWayAuthToken({
     });
 
     if (room.members.length > maxNumberParticipants) {
-      console.log("最大参加人数(" + maxNumberParticipants + ")を超えています");
+      console.log("??????(" + maxNumberParticipants + ")???????");
       room.dispose();
       return;
     }
@@ -225,4 +233,10 @@ const token = new SkyWayAuthToken({
 
     room.onMemberLeft.add(() => closeRoom());
   };
-})();
+};
+
+main().catch((err) => {
+  console.error(err);
+  alert(err.message || err);
+});
+
