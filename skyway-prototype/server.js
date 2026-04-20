@@ -79,13 +79,15 @@ app.get("/token", (req, res) => {
   }
 });
 
-// 0.0.0.0 にバインドすることで LAN 内の他端末からもアクセス可能になる
-app.listen(3000, "0.0.0.0", () => {
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, "0.0.0.0", () => {
   const lanIp = getLanIp();
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("✅ サーバー起動");
-  console.log(`   このPC     : http://localhost:3000`);
-  console.log(`   LAN内の端末 : http://${lanIp}:3000`);
+  console.log(`   ポート      : ${PORT}`);
+  console.log(`   このPC     : http://localhost:${PORT}`);
+  console.log(`   LAN内の端末 : http://${lanIp}:${PORT}`);
   console.log(`   APP_ID : ${appId  ?? "❌ 未設定 (.env を確認)"}`);
   console.log(`   SECRET : ${secretKey ? "✅ 設定済み" : "❌ 未設定 (.env を確認)"}`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

@@ -2,6 +2,9 @@
   "name": "skyway_demo",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "start": "node skyway-prototype/server.js"
+  },
   "dependencies": {
     "@skyway-sdk/token": "^2.0.1",
     "cors": "^2.8.5",
