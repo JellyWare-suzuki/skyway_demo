@@ -2,8 +2,19 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
+import os from "os";
 import { fileURLToPath } from "url";
 import { SkyWayAuthToken, nowInSec, uuidV4 } from "@skyway-sdk/token";
+
+// LAN内の IPv4 アドレスを取得する
+const getLanIp = () => {
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const iface of ifaces) {
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+    }
+  }
+  return "取得できませんでした";
+};
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -68,9 +79,13 @@ app.get("/token", (req, res) => {
   }
 });
 
-app.listen(3000, () => {
+// 0.0.0.0 にバインドすることで LAN 内の他端末からもアクセス可能になる
+app.listen(3000, "0.0.0.0", () => {
+  const lanIp = getLanIp();
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("✅ サーバー起動: http://localhost:3000");
+  console.log("✅ サーバー起動");
+  console.log(`   このPC     : http://localhost:3000`);
+  console.log(`   LAN内の端末 : http://${lanIp}:3000`);
   console.log(`   APP_ID : ${appId  ?? "❌ 未設定 (.env を確認)"}`);
   console.log(`   SECRET : ${secretKey ? "✅ 設定済み" : "❌ 未設定 (.env を確認)"}`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

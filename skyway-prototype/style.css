@@ -29,3 +29,16 @@ select{
 .id-text{
   font-size: 11px;
 }
+
+.remote-card {
+  border: 1px solid #ccc;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+#remote {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}

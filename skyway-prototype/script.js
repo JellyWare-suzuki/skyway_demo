@@ -48,14 +48,12 @@ const main = async () => {
   // DOM 取得
   const localVideo      = document.getElementById("local-video");
   const localAudio      = document.getElementById("local-audio");
-  const remoteVideo     = document.getElementById("remote-video");
-  const remoteAudio     = document.getElementById("remote-audio");
+  const remoteContainer = document.getElementById("remote");
   const roomNameInput   = document.getElementById("room-name");
   const joinButton      = document.getElementById("join-button");
   const localMuteButton = document.getElementById("local-mute-buton");
   const leaveButton     = document.getElementById("leave-button");
   const myId            = document.getElementById("my-id");
-  const remoteId        = document.getElementById("remote-id");
 
   let isJoined = false;
   let isMuted  = false;
@@ -63,6 +61,9 @@ const main = async () => {
   let room     = null;
   let localAudioPublication = null;
   let localVideoPublication = null;
+
+  // publisherId → { wrapper, video, audio } を管理する Map
+  const remoteMap = new Map();
 
   localMuteButton.disabled = true;
   leaveButton.disabled     = true;
@@ -94,21 +95,55 @@ const main = async () => {
   };
 
   // ==============================
+  // publisherId に対応するカード要素を取得（なければ生成）
+  // ==============================
+  const getOrCreateRemoteCard = (publisherId) => {
+    if (remoteMap.has(publisherId)) return remoteMap.get(publisherId);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "remote-card";
+    wrapper.dataset.publisherId = publisherId;
+
+    const idLabel = document.createElement("p");
+    idLabel.className = "id-text";
+    idLabel.textContent = `ID: ${publisherId}`;
+
+    const videoEl = document.createElement("video");
+    videoEl.autoplay = true;
+    videoEl.playsInline = true;
+
+    const audioEl = document.createElement("audio");
+    audioEl.autoplay = true;
+    audioEl.controls = true;
+
+    wrapper.appendChild(idLabel);
+    wrapper.appendChild(videoEl);
+    wrapper.appendChild(audioEl);
+    remoteContainer.appendChild(wrapper);
+
+    const card = { wrapper, videoEl, audioEl };
+    remoteMap.set(publisherId, card);
+    return card;
+  };
+
+  // ==============================
   // 相手のストリームを自動購読して表示
   // ==============================
   const subscribeAndAttach = async (publication) => {
     if (!me || publication.publisher.id === me.id) return;
 
-    log("📡 購読開始", `publisher=${publication.publisher.id}  type=${publication.contentType}`);
-    remoteId.textContent = publication.publisher.id;
+    const publisherId = publication.publisher.id;
+    log("📡 購読開始", `publisher=${publisherId}  type=${publication.contentType}`);
 
     const { stream } = await me.subscribe(publication.id);
     log("📡 購読完了", `kind=${stream.track.kind}`);
 
+    const card = getOrCreateRemoteCard(publisherId);
+
     if (stream.track.kind === "video") {
-      stream.attach(remoteVideo);
+      stream.attach(card.videoEl);
     } else if (stream.track.kind === "audio") {
-      stream.attach(remoteAudio);
+      stream.attach(card.audioEl);
     }
   };
 
@@ -132,7 +167,7 @@ const main = async () => {
       const roomName = roomNameInput.value;
       log(`🏠 Room.FindOrCreate 開始  name="${roomName}"  type=p2p`);
       room = await SkyWayRoom.FindOrCreate(context, {
-        type: "p2p",   // SFU より設定がシンプルで2人通話に最適
+        type: "p2p",
         name: roomName,
       });
       log("🏠 Room.FindOrCreate 完了", `roomId=${room.id}`);
@@ -168,6 +203,16 @@ const main = async () => {
         subscribeAndAttach(e.publication);
       });
 
+      // ── Step 9: 参加者が退出したらカードを削除 ──
+      room.onMemberLeft.add((e) => {
+        const leftId = e.member.id;
+        log("👋 メンバー退出", `id=${leftId}`);
+        if (remoteMap.has(leftId)) {
+          remoteMap.get(leftId).wrapper.remove();
+          remoteMap.delete(leftId);
+        }
+      });
+
       // ── 退出ボタン ──
       leaveButton.onclick = async () => {
         log("👋 退出開始");
@@ -181,7 +226,6 @@ const main = async () => {
     } catch (err) {
       log("❌ 接続エラー", err.message);
 
-      // WebSocket / 接続系のエラーに分かりやすいメッセージ
       if (
         err.message?.includes("WebSocket") ||
         err.message?.includes("connectRace") ||
@@ -206,13 +250,13 @@ const main = async () => {
   // UI リセット
   // ==============================
   const resetUI = () => {
-    myId.textContent       = "";
-    remoteId.textContent   = "";
-    remoteVideo.srcObject  = null;
-    remoteAudio.srcObject  = null;
-    joinButton.disabled    = false;
+    myId.textContent = "";
+    // 動的生成した全カードを削除
+    remoteMap.forEach(({ wrapper }) => wrapper.remove());
+    remoteMap.clear();
+    joinButton.disabled      = false;
     localMuteButton.disabled = true;
-    leaveButton.disabled   = true;
+    leaveButton.disabled     = true;
     localMuteButton.textContent = "映像・音声OFF";
     isJoined = false;
     isMuted  = false;
