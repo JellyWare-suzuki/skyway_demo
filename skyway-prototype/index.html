@@ -7,13 +7,23 @@
 
   <link rel="stylesheet" href="style.css" />
 
-  <!-- SkyWay Core -->
+  <!--
+    APP_CONFIG: フロントエンドに渡す公開設定値
+    ⚠️ accessKey はサーバーの APP_ACCESS_KEY と一致させること。
+    ⚠️ これは「第三者が /token を無断利用するのを防ぐ」簡易キーです。
+       HTML に含まれるため技術者には見えます。本格運用では認証システムを導入してください。
+  -->
+  <script>
+    window.APP_CONFIG = {
+      accessKey: "skyway-demo-2026-safe-key"
+    };
+  </script>
+
+  <!-- SkyWay Core SDK（ローカルファイル） -->
   <script src="./libs/skyway_core-1.15.2.js"></script>
 
-  <!-- SkyWay Room SDK -->
+  <!-- SkyWay Room SDK（ローカルファイル） -->
   <script src="./libs/skyway_room-1.15.2.js"></script>
-
-
 </head>
 
 <body>
@@ -35,7 +45,7 @@
     </div>
   </div>
 
-  <!-- SkyWay をすべてロードした後で script.js を実行 -->
+  <!-- SkyWay SDK をすべて読み込んだ後で script.js を実行 -->
   <script type="module" src="script.js"></script>
 </body>
 </html>

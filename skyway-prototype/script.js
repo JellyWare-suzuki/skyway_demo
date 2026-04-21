@@ -22,9 +22,19 @@ const waitForSkywayRoom = async (retries = 40, intervalMs = 200) => {
 };
 
 // サーバーからトークンを取得する
+// window.APP_CONFIG.accessKey を body に含めて POST する
 const fetchToken = async () => {
-  log("🔑 トークン取得開始 → GET /token");
-  const res = await fetch("/token");
+  log("🔑 トークン取得開始 → POST /token");
+
+  // APP_CONFIG が未定義の場合は index.html の設定を確認すること
+  const accessKey = window.APP_CONFIG?.accessKey ?? "";
+
+  const res = await fetch("/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accessKey }),
+  });
+
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`トークン取得失敗 (HTTP ${res.status}): ${body}`);
